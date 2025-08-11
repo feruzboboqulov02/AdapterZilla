@@ -18,7 +18,7 @@ import { XxxTransactionBroadcastParams, XxxTransactionBroadcastResults } from '.
  * @param confirmationLimit - Количество конфирмаций, число блоков которое отсчитывается после транзакции, чтобы считать ее завершенной.
  * @param utxoConfirmationLimit - Опциональное значение, используется только для сетей с utxo. Количество конфирмаций для utxo, число блоков которое отсчитывается после транзакции, чтобы считать ее завершенной.
  */
-export class XxxNodeAdapter extends BaseNodeAdapter {
+export class ZilNodeAdapter  extends BaseNodeAdapter {
   constructor(
     readonly network: string,
     readonly name: string = 'NN',
@@ -89,7 +89,22 @@ export class XxxNodeAdapter extends BaseNodeAdapter {
   /**
    * Функция-обертка для выполнения сетевого запроса.
    */
-  protected request<T, U>(method: 'POST' | 'GET' | 'PUT' | 'DELETE', url: string, data?: U, headers?: Record<string, string | number>): Promise<T> {
-    return null;
-  }
+protected async request<T, U>(
+  method: 'POST' | 'GET' | 'PUT' | 'DELETE',
+  url: string,
+  data?: U,
+  headers?: Record<string, string | number>
+): Promise<T> {
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(headers || {})
+    },
+    body: data ? JSON.stringify(data) : undefined
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} - ${res.statusText}`);
+  return res.json() as Promise<T>;
+}
+
 }
