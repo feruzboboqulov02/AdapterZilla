@@ -8,6 +8,7 @@ import {
   TxStatus,
 } from './common';
 import { XxxTransactionBroadcastParams, XxxTransactionBroadcastResults } from './types';
+import { Transaction } from './common/index';
 
 /**
  * Класс, который инициализируется в XxxCoinService для выполнения сетевых запросов.
@@ -56,12 +57,27 @@ export class ZilNodeAdapter  extends BaseNodeAdapter {
   );
   // Здесь нужно преобразовать результат в TxByHashResult (from/to/status и т.д.)
   return {
-    hash,
-    ticker,
-    from: [{ address: result.result.sender, value: result.result.amount }],
-    to: [{ address: result.result.toAddr, value: result.result.amount }],
-    status: TxStatus.finished
-  };
+  hash,
+  ticker: 'ZIL',
+  from: [{
+    address: result.result.sender,
+    value: String(result.result.amount || '0')
+  }],
+  to: [{
+    address: result.result.toAddr,
+    value: String(result.result.amount || '0')
+  }],
+  status: result.result.receipt?.success
+    ? TxStatus.finished
+    : result.result.receipt?.success === false
+      ? TxStatus.failed
+      : TxStatus.unknown,
+  height: result.result.blockNumber
+    ? Number(result.result.blockNumber)
+    : undefined,
+  data: result.result
+};
+
 }
 
 
@@ -89,13 +105,35 @@ export class ZilNodeAdapter  extends BaseNodeAdapter {
     { id: 1, jsonrpc: '2.0', method: 'GetBlockByNum', params: [height, true] },
     { 'api-key': process.env.NOWNODES_API_KEY }
   );
+
+  const transactions = (result.result.Transactions || []).map((tx: any) => ({
+    hash: tx.ID || tx.hash,
+    ticker: 'ZIL',
+    from: [{
+      address: tx.sender || tx.fromAddr || '',
+      value: String(tx.amount || '0')
+    }],
+    to: [{
+      address: tx.toAddr || '',
+      value: String(tx.amount || '0')
+    }],
+    status: tx.receipt?.success
+      ? TxStatus.finished
+      : tx.receipt?.success === false
+        ? TxStatus.failed
+        : TxStatus.unknown,
+    height,
+    data: tx
+  }));
+
   return {
     height,
     timestamp: new Date(result.result.header.Timestamp * 1000),
-    transactions: [], // нужно будет отформатировать result.result.transactions под Transaction[]
+    transactions,
     data: result
   };
 }
+
 
 
   /**
