@@ -5,6 +5,7 @@ import {
   GetBlockResult,
   GetHeightResult,
   TxByHashResult,
+  TxStatus,
 } from './common';
 import { XxxTransactionBroadcastParams, XxxTransactionBroadcastResults } from './types';
 
@@ -44,47 +45,99 @@ export class ZilNodeAdapter  extends BaseNodeAdapter {
    * В случая если сеть не btc-like (нет utxo) и processTransaction вернул массив транзакций, то необходимо взять только первую транзакцию. Так как этот метод, в основном, важен только для получения статуса транзакции.
    */
   async txByHash(
-    ticker: string,
-    hash: string,
-  ): Promise<TxByHashResult> {
-    return null;
-  }
+  ticker: string,
+  hash: string
+): Promise<TxByHashResult> {
+  const result = await this.request<any, any>(
+    'POST',
+    `${this.url}`,
+    { id: 1, jsonrpc: '2.0', method: 'GetTransaction', params: [hash] },
+    { 'api-key': process.env.NOWNODES_API_KEY }
+  );
+  // Здесь нужно преобразовать результат в TxByHashResult (from/to/status и т.д.)
+  return {
+    hash,
+    ticker,
+    from: [{ address: result.result.sender, value: result.result.amount }],
+    to: [{ address: result.result.toAddr, value: result.result.amount }],
+    status: TxStatus.finished
+  };
+}
+
 
   /**
    * Функция запроса высоты блокчейна.
    */
   async getHeight(): Promise<GetHeightResult> {
-    return null;
-  }
+  const result = await this.request<{ result: string }, unknown>(
+    'POST',
+    `${this.url}`,
+    { id: 1, jsonrpc: '2.0', method: 'GetBlockchainInfo', params: [] },
+    { 'api-key': process.env.NOWNODES_API_KEY }
+  );
+  return Number(result.result);
+}
+
 
   /**
    * Функция запроса блока и транзакций которые в этом блоке находятся по его высоте.
    */
-  async getBlock(
-    height: number,
-  ): Promise<GetBlockResult> {
-    return null;
-  }
+  async getBlock(height: number): Promise<GetBlockResult> {
+  const result = await this.request<any, any>(
+    'POST',
+    `${this.url}`,
+    { id: 1, jsonrpc: '2.0', method: 'GetBlockByNum', params: [height, true] },
+    { 'api-key': process.env.NOWNODES_API_KEY }
+  );
+  return {
+    height,
+    timestamp: new Date(result.result.header.Timestamp * 1000),
+    transactions: [], // нужно будет отформатировать result.result.transactions под Transaction[]
+    data: result
+  };
+}
+
 
   /**
    * Функция запроса баланса по адресу и тикеру.
    */
   async balanceByAddress(
-    ticker: string,
-    address: string,
-  ): Promise<BalanceByAddressResult> {
-    return null;
-  }
+  ticker: string,
+  address: string
+): Promise<BalanceByAddressResult> {
+  const result = await this.request<any, any>(
+    'POST',
+    `${this.url}`,
+    { id: 1, jsonrpc: '2.0', method: 'GetBalance', params: [address] },
+    { 'api-key': process.env.NOWNODES_API_KEY }
+  );
+  return {
+    balance: result.result.balance,
+    totalBalance: result.result.balance
+  };
+}
+
 
   /**
    * Функция отправки в сеть подписанной транзакции.
    */
   async txBroadcast(
-    ticker: string,
-    params: XxxTransactionBroadcastParams,
-  ): Promise<XxxTransactionBroadcastResults | { error: string }> {
-    return null;
+  ticker: string,
+  params: XxxTransactionBroadcastParams
+): Promise<XxxTransactionBroadcastResults | { error: string }> {
+  try {
+    const result = await this.request<any, any>(
+      'POST',
+      `${this.url}`,
+      { id: 1, jsonrpc: '2.0', method: 'CreateTransaction', params: [params.signedData] },
+      { 'api-key': process.env.NOWNODES_API_KEY }
+    );
+    return { hash: result.result.TranID };
+  } catch (err) {
+    return { error: (err as Error).message };
   }
+}
+
 
   /**
    * Функция-обертка для выполнения сетевого запроса.
